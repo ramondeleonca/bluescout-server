@@ -7,6 +7,9 @@ import platform
 import sys
 import os
 import utils
+import json
+import qrcode
+import pandas as pd
 from pyzbar import pyzbar
 from typing import Literal
 from constants import *
@@ -17,6 +20,7 @@ FROZEN: bool = getattr(sys, 'frozen', False)
 DIRNAME: str = sys._MEIPASS if FROZEN else os.path.dirname(os.path.realpath(__file__))
 OS: Literal["linux", "windows", "darwin", "java"] = platform.system().lower()
 TEMPDIR = tempfile.TemporaryDirectory(prefix=TEMP_DIR_PREFIX, suffix=uuid.uuid4().hex)
+CAMERA = int(input("Camera index: "))
 
 # Create a window and configure it
 root = tk.Tk()
@@ -24,20 +28,24 @@ root.title(WINDOW_TITLE)
 root.geometry(WINDOW_SIZE)
 
 # Create the camera object
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(CAMERA)
 
 # Create a label to display the camera feed
 label = tk.Label(root)
 label.pack()
 
 qrs: list[pyzbar.Decoded] = []
+update_loop_running: bool = False
 def update_loop():
-    # Reat the new frame from the camera
+    # Global vars
+    global cap
+    
+    # Read the new frame from the camera
     ret, frame = cap.read()
     
     # If the frame was read successfully
     if ret:
-        # Convert it to RGB
+        # Convert it to RGB and resize it
         frame = cv2.resize(frame, (IMAGE_WIDTH, IMAGE_HEIGHT))
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
@@ -87,15 +95,17 @@ def update_loop():
         label.image = photo
 
     # Call this function again after 10ms
-    root.after(10, update_loop)
+    if update_loop_running:
+        root.after(10, update_loop)
 
 def on_qr_found(qr: pyzbar.Decoded, data: dict):
     print("qr found")
 
 def on_new_qr_found(qr: pyzbar.Decoded, data: dict):
-    print("qr found")
+    print("new qr found")
 
 try:
+    update_loop_running = True
     update_loop()
     root.mainloop()
 finally:
